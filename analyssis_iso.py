@@ -640,70 +640,81 @@ class VibrationAnalysisApp:
                 output_csv = os.path.join(output_folder, f"{measurement_name}_results.csv")
                 results_df.to_csv(output_csv, index=False)
                 
-                # Save plots
-                output_pdf = os.path.join(output_folder, f"{measurement_name}_plots.pdf")
-                fig.savefig(output_pdf, format='pdf', bbox_inches='tight')
+                # Save plots only if fig is not None
+                if fig is not None:
+                    output_pdf = os.path.join(output_folder, f"{measurement_name}_plots.pdf")
+                    fig.savefig(output_pdf, format='pdf', bbox_inches='tight')
+                    
+                    output_svg = os.path.join(output_folder, f"{measurement_name}_plots.svg")
+                    fig.savefig(output_svg, format='svg', bbox_inches='tight')
+                    
+                    self.results_text.insert(tk.END, f"  Plots saved to: {output_pdf}\n")
+                else:
+                    self.results_text.insert(tk.END, f"⚠️ Could not generate plots for {measurement_name}\n")
                 
-                output_svg = os.path.join(output_folder, f"{measurement_name}_plots.svg")
-                fig.savefig(output_svg, format='svg', bbox_inches='tight')
-                
-                # Generate comprehensive report
-                output_report = os.path.join(output_folder, f"{measurement_name}_report.pdf")
-                with PdfPages(output_report) as pdf:
-                    # Title page
-                    plt.figure(figsize=(8.27, 11.69))
-                    plt.text(0.5, 0.9, "ISO 2631-1 Vibration Analysis Report", 
-                            ha='center', va='center', fontsize=16)
-                    plt.text(0.5, 0.85, f"File: {measurement_name}", 
-                            ha='center', va='center', fontsize=12)
-                    plt.text(0.5, 0.8, f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 
-                            ha='center', va='center', fontsize=10)
-                    plt.axis('off')
-                    pdf.savefig(bbox_inches='tight')
-                    plt.close()
+                # Generate comprehensive report only if fig is not None
+                if fig is not None:
+                    output_report = os.path.join(output_folder, f"{measurement_name}_report.pdf")
+                    with PdfPages(output_report) as pdf:
+                        # Title page
+                        plt.figure(figsize=(8.27, 11.69))
+                        plt.text(0.5, 0.9, "ISO 2631-1 Vibration Analysis Report", 
+                                ha='center', va='center', fontsize=16)
+                        plt.text(0.5, 0.85, f"File: {measurement_name}", 
+                                ha='center', va='center', fontsize=12)
+                        plt.text(0.5, 0.8, f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 
+                                ha='center', va='center', fontsize=10)
+                        plt.axis('off')
+                        pdf.savefig(bbox_inches='tight')
+                        plt.close()
+                        
+                        # Results table
+                        fig_table, ax = plt.subplots(figsize=(8.27, 11.69))
+                        ax.axis('off')
+                        table_data = results_df.fillna("").values.tolist()
+                        col_labels = results_df.columns.tolist()
+                        table = ax.table(cellText=table_data, colLabels=col_labels, 
+                                    loc='center', cellLoc='center')
+                        table.auto_set_font_size(False)
+                        table.set_fontsize(8)
+                        table.scale(1, 1.5)
+                        pdf.savefig(fig_table, bbox_inches='tight')
+                        plt.close(fig_table)
+                        
+                        # Analysis plots
+                        pdf.savefig(fig, bbox_inches='tight')
+                        
+                        # Additional spectral analysis
+                        if av_signal is not None:
+                            try:
+                                n = len(av_signal)
+                                fs = 1 / (time_data[1] - time_data[0])
+                                fft_vals = np.abs(np.fft.rfft(av_signal))
+                                freqs = np.fft.rfftfreq(n, d=1/fs)
+                                
+                                fig_spectrum = plt.figure(figsize=(10, 5))
+                                plt.semilogy(freqs, fft_vals + 1e-8)
+                                plt.title("FFT of Weighted Vector Sum (av)")
+                                plt.xlabel("Frequency (Hz)")
+                                plt.ylabel("Amplitude")
+                                plt.grid(True, which="both")
+                                plt.xlim(0, 100)
+                                pdf.savefig(fig_spectrum, bbox_inches='tight')
+                                plt.close(fig_spectrum)
+                            except Exception as e:
+                                self.results_text.insert(tk.END, f"⚠️ Could not generate spectrum plot: {e}\n")
                     
-                    # Results table
-                    fig_table, ax = plt.subplots(figsize=(8.27, 11.69))
-                    ax.axis('off')
-                    table_data = results_df.fillna("").values.tolist()
-                    col_labels = results_df.columns.tolist()
-                    table = ax.table(cellText=table_data, colLabels=col_labels, 
-                                   loc='center', cellLoc='center')
-                    table.auto_set_font_size(False)
-                    table.set_fontsize(8)
-                    table.scale(1, 1.5)
-                    pdf.savefig(fig_table, bbox_inches='tight')
-                    plt.close(fig_table)
-                    
-                    # Analysis plots
-                    pdf.savefig(fig, bbox_inches='tight')
-                    
-                    # Additional spectral analysis
-                    if av_signal is not None:
-                        try:
-                            n = len(av_signal)
-                            fs = 1 / (time_data[1] - time_data[0])
-                            fft_vals = np.abs(np.fft.rfft(av_signal))
-                            freqs = np.fft.rfftfreq(n, d=1/fs)
-                            
-                            fig_spectrum = plt.figure(figsize=(10, 5))
-                            plt.semilogy(freqs, fft_vals + 1e-8)
-                            plt.title("FFT of Weighted Vector Sum (av)")
-                            plt.xlabel("Frequency (Hz)")
-                            plt.ylabel("Amplitude")
-                            plt.grid(True, which="both")
-                            plt.xlim(0, 100)
-                            pdf.savefig(fig_spectrum, bbox_inches='tight')
-                            plt.close(fig_spectrum)
-                        except Exception as e:
-                            self.results_text.insert(tk.END, f"⚠️ Could not generate spectrum plot: {e}\n")
+                    self.results_text.insert(tk.END, f"  Report saved to: {output_report}\n")
                 
                 self.results_text.insert(tk.END, f"  Results saved to: {output_folder}\n")
-                plt.close('all')
                 
             except Exception as e:
                 self.results_text.insert(tk.END, f"❌ Error analyzing {os.path.basename(file_path)}: {str(e)}\n")
                 continue
+            finally:
+                if fig is not None:
+                    plt.close(fig)
+                plt.close('all')
         
         self.results_text.insert(tk.END, "\nAnalysis complete!\n")
         messagebox.showinfo("Analysis Complete", f"All files analyzed. Results saved in:\n{analysis_root}")
@@ -741,78 +752,82 @@ class VibrationAnalysisApp:
             results_df.to_csv(output_csv, index=False)
             self.results_text.insert(tk.END, f"\nResults saved to: {output_csv}\n")
             
-            # Save plots in vector formats
-            output_pdf = os.path.join(output_folder, f"{measurement_name}_plots.pdf")
-            fig.savefig(output_pdf, format='pdf', bbox_inches='tight')
-            self.results_text.insert(tk.END, f"Plots saved to PDF: {output_pdf}\n")
-            
-            output_svg = os.path.join(output_folder, f"{measurement_name}_plots.svg")
-            fig.savefig(output_svg, format='svg', bbox_inches='tight')
-            self.results_text.insert(tk.END, f"Plots saved to SVG: {output_svg}\n")
-            
-            # Generate comprehensive PDF report
-            output_report = os.path.join(output_folder, f"{measurement_name}_report.pdf")
-            with PdfPages(output_report) as pdf:
-                # Title page
-                plt.figure(figsize=(8.27, 11.69))
-                plt.text(0.5, 0.9, "ISO 2631-1 Vibration Analysis Report", 
-                        ha='center', va='center', fontsize=16)
-                plt.text(0.5, 0.85, f"File: {measurement_name}", 
-                        ha='center', va='center', fontsize=12)
-                plt.text(0.5, 0.8, f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 
-                        ha='center', va='center', fontsize=10)
-                plt.axis('off')
-                pdf.savefig(bbox_inches='tight')
-                plt.close()
+            # Save plots in vector formats only if fig is not None
+            if fig is not None:
+                output_pdf = os.path.join(output_folder, f"{measurement_name}_plots.pdf")
+                fig.savefig(output_pdf, format='pdf', bbox_inches='tight')
+                self.results_text.insert(tk.END, f"Plots saved to PDF: {output_pdf}\n")
                 
-                # Results table
-                fig_table, ax = plt.subplots(figsize=(8.27, 11.69))
-                ax.axis('off')
-                table_data = results_df.fillna("").values.tolist()
-                col_labels = results_df.columns.tolist()
-                table = ax.table(cellText=table_data, colLabels=col_labels, 
-                               loc='center', cellLoc='center')
-                table.auto_set_font_size(False)
-                table.set_fontsize(8)
-                table.scale(1, 1.5)
-                pdf.savefig(fig_table, bbox_inches='tight')
-                plt.close(fig_table)
-                
-                # Analysis plots
-                pdf.savefig(fig, bbox_inches='tight')
-                
-                # Additional spectral analysis
-                if av_signal is not None:
-                    try:
-                        n = len(av_signal)
-                        fs = 1 / (time_data[1] - time_data[0])
-                        fft_vals = np.abs(np.fft.rfft(av_signal))
-                        freqs = np.fft.rfftfreq(n, d=1/fs)
-                        
-                        fig_spectrum = plt.figure(figsize=(10, 5))
-                        plt.semilogy(freqs, fft_vals + 1e-8)
-                        plt.title("FFT of Weighted Vector Sum (av)")
-                        plt.xlabel("Frequency (Hz)")
-                        plt.ylabel("Amplitude")
-                        plt.grid(True, which="both")
-                        plt.xlim(0, 100)
-                        pdf.savefig(fig_spectrum, bbox_inches='tight')
-                        plt.close(fig_spectrum)
-                    except Exception as e:
-                        self.results_text.insert(tk.END, f"⚠️ Could not generate spectrum plot: {e}\n")
+                output_svg = os.path.join(output_folder, f"{measurement_name}_plots.svg")
+                fig.savefig(output_svg, format='svg', bbox_inches='tight')
+                self.results_text.insert(tk.END, f"Plots saved to SVG: {output_svg}\n")
+            else:
+                self.results_text.insert(tk.END, "⚠️ Could not generate plots\n")
             
-            self.results_text.insert(tk.END, f"Full report saved to: {output_report}\n")
+            # Generate comprehensive PDF report only if fig is not None
+            if fig is not None:
+                output_report = os.path.join(output_folder, f"{measurement_name}_report.pdf")
+                with PdfPages(output_report) as pdf:
+                    # Title page
+                    plt.figure(figsize=(8.27, 11.69))
+                    plt.text(0.5, 0.9, "ISO 2631-1 Vibration Analysis Report", 
+                            ha='center', va='center', fontsize=16)
+                    plt.text(0.5, 0.85, f"File: {measurement_name}", 
+                            ha='center', va='center', fontsize=12)
+                    plt.text(0.5, 0.8, f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 
+                            ha='center', va='center', fontsize=10)
+                    plt.axis('off')
+                    pdf.savefig(bbox_inches='tight')
+                    plt.close()
+                    
+                    # Results table
+                    fig_table, ax = plt.subplots(figsize=(8.27, 11.69))
+                    ax.axis('off')
+                    table_data = results_df.fillna("").values.tolist()
+                    col_labels = results_df.columns.tolist()
+                    table = ax.table(cellText=table_data, colLabels=col_labels, 
+                                loc='center', cellLoc='center')
+                    table.auto_set_font_size(False)
+                    table.set_fontsize(8)
+                    table.scale(1, 1.5)
+                    pdf.savefig(fig_table, bbox_inches='tight')
+                    plt.close(fig_table)
+                    
+                    # Analysis plots
+                    pdf.savefig(fig, bbox_inches='tight')
+                    
+                    # Additional spectral analysis
+                    if av_signal is not None:
+                        try:
+                            n = len(av_signal)
+                            fs = 1 / (time_data[1] - time_data[0])
+                            fft_vals = np.abs(np.fft.rfft(av_signal))
+                            freqs = np.fft.rfftfreq(n, d=1/fs)
+                            
+                            fig_spectrum = plt.figure(figsize=(10, 5))
+                            plt.semilogy(freqs, fft_vals + 1e-8)
+                            plt.title("FFT of Weighted Vector Sum (av)")
+                            plt.xlabel("Frequency (Hz)")
+                            plt.ylabel("Amplitude")
+                            plt.grid(True, which="both")
+                            plt.xlim(0, 100)
+                            pdf.savefig(fig_spectrum, bbox_inches='tight')
+                            plt.close(fig_spectrum)
+                        except Exception as e:
+                            self.results_text.insert(tk.END, f"⚠️ Could not generate spectrum plot: {e}\n")
+                
+                self.results_text.insert(tk.END, f"Full report saved to: {output_report}\n")
             
             # Show summary in results text
             self.results_text.insert(tk.END, "\nAnalysis Summary:\n")
             self.results_text.insert(tk.END, results_df.to_string())
             
-            plt.show()
-            
         except Exception as e:
             messagebox.showerror("Analysis Error", f"Error during analysis:\n{str(e)}")
             self.results_text.insert(tk.END, f"\n❌ Error: {str(e)}\n")
         finally:
+            if fig is not None:
+                plt.close(fig)
             plt.close('all')
 
 def main():
