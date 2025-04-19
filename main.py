@@ -12,38 +12,44 @@ from tkinter import ttk, messagebox
 from pathlib import Path
 
 class AccelerometerApp:
+    import nidaqmx
+import numpy as np
+import matplotlib.pyplot as plt
+import time
+from nidaqmx.constants import TerminalConfiguration
+import threading
+import queue
+import os
+from datetime import datetime
+import tkinter as tk
+from tkinter import ttk, messagebox
+from pathlib import Path
+
+class AccelerometerApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Accelerometer Measurement System")
         self.root.geometry("600x500")
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
-        
-        # Initialize queues for thread communication
+
         self.plot_queue = queue.Queue()
         self.status_queue = queue.Queue()
-        
-        # Measurement parameters
+
         self.device = 'cDAQ1Mod1'
         self.num_channels = 4
-        self.sampling_rate = 10000  # Hz
-        self.available_durations = [5, 10, 15, 20, 25, 30, 35, 40, 45]  # seconds
-        self.duration = 20  # default duration
+        self.sampling_rate = 10000
+        self.available_durations = list(range(5, 65, 5))  # 5 to 60 sec
+        self.duration = 60
         self.sensitivities = [0.01051, 0.01076, 0.01055, 0.01000]
-        
-        # Current measurement state
+
         self.car_name = ""
         self.seat_position = 0
         self.measurement_numbers = {1: 0, 2: 0, 3: 0}
         self.measurement_active = False
         self.daq_initialized = False
-        
-        # Create widgets
+
         self.create_widgets()
-        
-        # Start queue handler
         self.root.after(100, self.process_queues)
-        
-        # Initialize DAQ in separate thread
         threading.Thread(target=self.initialize_daq, daemon=True).start()
     
     def create_widgets(self):
@@ -170,6 +176,7 @@ class AccelerometerApp:
                     samps_per_chan=discard_samples
                 )
                 init_task.start()
+                time.sleep(0.1)
                 # Read and discard initial samples
                 init_task.read(number_of_samples_per_channel=discard_samples)
                 init_task.stop()
@@ -314,22 +321,17 @@ class AccelerometerApp:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"measurement_{measurement_num:02d}_{timestamp}.csv"
             file_path = seat_dir / filename
-        
-            # Prepare data for saving with proper metadata
-            time_vector = np.linspace(0, self.duration, self.samples)
-            if any(np.diff(time_vector) <= 0):
-                raise ValueError("Invalid time vector - non-increasing time values detected")
-
+            
+            # Prepare data for saving
+            time_vector = np.arange(self.samples) / self.sampling_rate
             output_data = np.vstack((time_vector, acc_data)).T
-        
-            header = (
-                f"Car: {self.car_name}, Seat: {self.seat_position}, Duration: {self.duration}s\n"
-                f"Sampling Rate: {self.sampling_rate}Hz, Channels: {self.num_channels}\n"
-                "Time(s),Channel1(g),Channel2(g),Channel3(g),Channel4(g)"
-            )
-
-            # Zapis danych z precyzją 6 miejsc po przecinku
-            np.savetxt(file_path, output_data, delimiter=',', header=header, comments='', fmt='%.6f')
+            
+            # Column headers
+            header = (f"Car: {self.car_name}, Seat: {self.seat_position}, Duration: {self.duration}s\n"
+                     f"Time (s)," + ",".join([f"Channel {i+1} (g)" for i in range(self.num_channels)]))
+            
+            # Save data to CSV
+            np.savetxt(file_path, output_data, delimiter=',', header=header, comments='')
             
             # Update measurement count
             self.measurement_numbers[self.seat_position] = measurement_num
