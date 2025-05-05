@@ -77,7 +77,7 @@ class ISO2631Analyzer:
     def crest_factor(self, signal):
         return np.max(np.abs(signal)) / self.calculate_rms(signal)
 
-    def fft_limited(self, sig_data, fmax=100):
+    def fft_limited(self, sig_data, fmax=80):
         f, Pxx = signal.welch(sig_data, fs=self.fs, nperseg=2048)
         mask = f <= fmax
         return f[mask], Pxx[mask]
@@ -86,18 +86,21 @@ class ISO2631Analyzer:
         base_dir = Path(r"D:/1UNIVERSITY/10th semester/master thesis/code/python_reading_acc/csv_analiza")
         car_folder = self.csv_path.parents[1].name + "_analiza"
         output_dir = base_dir / car_folder / self.csv_path.parent.name
-        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Tworzenie folderu pomiarowego z timestampem
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        measurement_folder = output_dir / f"measurement_{self.csv_path.stem}_{timestamp}"
+        measurement_folder.mkdir(parents=True, exist_ok=True)
+
+        pdf_path = measurement_folder / f"{self.csv_path.stem}_full_report.pdf"
+        pdf = matplotlib.backends.backend_pdf.PdfPages(pdf_path)
 
         rms_results = {}
         vector_sum_sq = 0
         axes = ['x', 'y', 'z', 'z']
         gains = {'x': 1.4, 'y': 1.4, 'z': 1.0}
-
         description_lines = [f"Raport ISO 2631-1\nData: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n",
-                             f"Plik: {self.csv_path.name}\n"]
-
-        pdf_path = output_dir / f"{self.csv_path.stem}_full_report.pdf"
-        pdf = matplotlib.backends.backend_pdf.PdfPages(pdf_path)
+                            f"Plik: {self.csv_path.name}\n"]
 
         for i, axis in enumerate(axes):
             try:
@@ -119,26 +122,39 @@ class ISO2631Analyzer:
                 description_lines.append(f"Kanał {i+1} (oś {axis}):")
                 description_lines.append(f"  RMS = {rms:.4f} m/s²")
                 description_lines.append(f"  VDV = {vdv:.4f} m/s⁴⁰.25")
-                description_lines.append(f"  Crest Factor = {crest:.2f} → 'Uwaga na piki!' if crest > 9 else 'OK''OK'\n")
+                description_lines.append(f"  Crest Factor = {crest:.2f} → {'Uwaga na piki!' if crest > 9 else 'OK'}\n")
 
-                # wykres czasowy
-                fig, ax = plt.subplots()
-                ax.plot(self.time, raw)
-                ax.set_title(f"Kanał {i+1} — surowy sygnał")
-                ax.set_xlabel("Czas [s]")
-                ax.set_ylabel("Przyspieszenie [g]")
-                ax.grid()
-                pdf.savefig(fig)
-                plt.close(fig)
+                # Wykres surowy sygnał
+                fig_raw, ax_raw = plt.subplots()
+                ax_raw.plot(self.time, raw)
+                ax_raw.set_title(f"Kanał {i+1} — surowy sygnał")
+                ax_raw.set_xlabel("Czas [s]")
+                ax_raw.set_ylabel("Przyspieszenie [g]")
+                ax_raw.grid()
+                pdf.savefig(fig_raw)
+                fig_raw.savefig(measurement_folder / f"channel_{i+1}_raw.svg", format='svg')
+                plt.close(fig_raw)
 
-                # FFT (do 100 Hz)
+                # Wykres po nałożeniu wag
+                fig_filtered, ax_filtered = plt.subplots()
+                ax_filtered.plot(self.time, filtered)
+                ax_filtered.set_title(f"Kanał {i+1} — po nałożeniu wag ({axis.upper()})")
+                ax_filtered.set_xlabel("Czas [s]")
+                ax_filtered.set_ylabel("Przyspieszenie [g]")
+                ax_filtered.grid()
+                pdf.savefig(fig_filtered)
+                fig_filtered.savefig(measurement_folder / f"channel_{i+1}_weighted.svg", format='svg')
+                plt.close(fig_filtered)
+
+                # Wykres FFT (0–80 Hz)
                 fig_fft, ax_fft = plt.subplots()
                 ax_fft.plot(f_fft, P_fft)
-                ax_fft.set_title(f"Kanał {i+1} — widmo (0–100 Hz)")
+                ax_fft.set_title(f"Kanał {i+1} — widmo (0–80 Hz)")
                 ax_fft.set_xlabel("Częstotliwość [Hz]")
                 ax_fft.set_ylabel("Amplituda")
                 ax_fft.grid()
                 pdf.savefig(fig_fft)
+                fig_fft.savefig(measurement_folder / f"channel_{i+1}_fft.svg", format='svg')
                 plt.close(fig_fft)
 
             except Exception as e:
@@ -148,7 +164,6 @@ class ISO2631Analyzer:
         rms_results['vector_sum_rms'] = vector_sum
         description_lines.append(f"\nSumaryczna ocena (Vector RMS): {vector_sum:.4f} m/s²")
 
-        # Ocena komfortu wg ISO
         if vector_sum < 0.315:
             desc = "Komfort dobry (poniżej 0.315 m/s²)"
         elif vector_sum < 0.63:
@@ -157,11 +172,11 @@ class ISO2631Analyzer:
             desc = "🔴 Uciążliwe drgania — może wpływać na zdrowie"
         description_lines.append(f"Ocena komfortu: {desc}\n")
 
-        # Zapis CSV
-        results_path = output_dir / f"{self.csv_path.stem}_results.csv"
+        # Zapis CSV z wynikami
+        results_path = measurement_folder / f"{self.csv_path.stem}_results.csv"
         pd.DataFrame([rms_results]).to_csv(results_path, index=False)
 
-        # Strona tekstowa raportu
+        # Tekstowy opis w PDF
         fig_text = plt.figure(figsize=(8.3, 11.7))
         fig_text.clf()
         txt = "\n".join(description_lines)
@@ -171,6 +186,7 @@ class ISO2631Analyzer:
 
         pdf.close()
         return results_path
+
 
 # GUI
 class AnalysisApp:

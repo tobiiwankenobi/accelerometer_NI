@@ -1,5 +1,0 @@
-Channel,Filter,RMS (g),Weighted RMS (g),VDV (g·s^1.75),MTVV (g),Crest Factor,Dominant Freq (Hz),Comfort,Health
-x,Wd,0.002262405545884794,0.0031673677642387113,0.0026817307786914392,0.002262425408905176,1.8459029713232102,"49.00, 98.00","('Not uncomfortable', '⚪️')","('Health effects not clearly documented', '⚪️')"
-y,Wd,0.0008962833828813783,0.0012547967360339296,0.001040814798674314,0.0008962891759453353,1.8464125906521762,"49.00, 98.00","('Not uncomfortable', '⚪️')","('Health effects not clearly documented', '⚪️')"
-z,Wk,0.00867943603940817,0.00867943603940817,0.010182668523496124,0.008679515370266809,1.821395502918053,"49.00, 98.00","('Not uncomfortable', '⚪️')","('Health effects not clearly documented', '⚪️')"
-Vector Sum,N/A,0.009014122958927114,0.009014122958927114,0.010580490686475305,0.009014204905618372,1.8186127968839112,"49.00, 98.00","('Not uncomfortable', '⚪️')",N/A (use individual axes for health)

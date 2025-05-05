@@ -38,7 +38,7 @@ class AccelerometerApp:
         self.device = 'cDAQ1Mod1'
         self.num_channels = 4
         self.sampling_rate = 10000
-        self.available_durations = list(range(5, 65, 5))  # 5 to 60 sec
+        self.available_durations = [round(m, 1) for m in np.arange(1, 10.5, 1)]  # # 0.5–10 min co 0.5
         self.duration = 60
         self.sensitivities = [0.01051, 0.01076, 0.01055, 0.01000]
 
@@ -83,7 +83,7 @@ class AccelerometerApp:
             ).grid(row=2, column=i+1, sticky=tk.W, padx=5)
         
         # Measurement duration selection
-        ttk.Label(self.main_frame, text="Duration (s):").grid(row=3, column=0, sticky=tk.W, pady=5)
+        ttk.Label(self.main_frame, text="Duration (min):").grid(row=3, column=0, sticky=tk.W, pady=5)
         self.duration_var = tk.IntVar(value=self.duration)
         self.duration_menu = ttk.Combobox(
             self.main_frame,
@@ -149,7 +149,7 @@ class AccelerometerApp:
     
     def update_duration(self, event=None):
         """Update measurement duration from combobox selection"""
-        self.duration = self.duration_var.get()
+        self.duration = int(float(self.duration_var.get()) * 60)
         self.status_var.set(f"Measurement duration set to {self.duration} seconds")
     
     def initialize_daq(self):
@@ -198,7 +198,7 @@ class AccelerometerApp:
         
         if self.car_name:
             info = f"Current Car: {self.car_name}\n"
-            info += f"Next Measurement Duration: {self.duration} seconds\n\n"
+            info += f"Next Measurement Duration: {self.duration // 60} min\n\n"
             
             for seat in range(1, 4):
                 count = self.measurement_numbers.get(seat, 0)
@@ -348,13 +348,15 @@ class AccelerometerApp:
             ))
             
             # Add plot to queue
-            self.plot_queue.put((time_vector, acc_data, measurement_num))
+            #self.plot_queue.put((time_vector, acc_data, measurement_num))
             
         except Exception as e:
+            error_message = str(e)
             self.root.after(0, lambda: messagebox.showerror(
                 "Measurement Error", 
-                f"Error during measurement:\n{str(e)}")
-            )
+                 f"Error during measurement:\n{error_message}")
+        )
+
         finally:
             self.measurement_active = False
             self.root.after(0, self.enable_ui)

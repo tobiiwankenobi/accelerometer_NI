@@ -1,3 +1,0 @@
-Channel,Filter,Error
-x,Wd,loop of ufunc does not support argument 0 of type float which has no callable sqrt method
-y,Wd,loop of ufunc does not support argument 0 of type float which has no callable sqrt method
